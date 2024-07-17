@@ -8,17 +8,15 @@
 import numpy as np
 import rospy, os, sys, cv2
 
+import torch
+from matplotlib import pyplot as plt
+import cv2
+from PIL import Image
+from pathlib import Path
+
 from raf.msg import DetectionList, RafState
 from sensor_msgs.msg import Image, RegionOfInterest
 from cv_bridge import CvBridge
-
-from detectron2 import model_zoo
-from detectron2.engine import DefaultPredictor
-from detectron2.config import get_cfg
-from detectron2.data import MetadataCatalog
-from detectron2.data.datasets import register_coco_instances
-from detectron2.utils.logger import setup_logger
-setup_logger()
 
 class maskRCNN(object):
     def __init__(self):
@@ -112,50 +110,56 @@ class maskRCNN(object):
         self.loop_rate.sleep()
 
 def main():
-    """ Mask RCNN Object Detection with Detectron2 """
     rospy.init_node("arm_cam_detections", anonymous=True)
 
-    register_coco_instances("train_set", {}, "/home/labuser/ros_ws/src/raf/arm_camera_dataset2/train/annotations.json", "/home/labuser/ros_ws/src/raf/arm_camera_dataset2/train")
-    # train_metadata = MetadataCatalog.get("train_set")
-    # print(train_metadata)
-
-    cfg = get_cfg()
-    cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
-    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 16  # 16 classes
-
-    # Temporary Solution. If I train again I think I can use the dynamically set path again
-    cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "/home/labuser/ros_ws/src/raf/arm_camera_dataset2/models/final_model/model_final.pth")
-    # cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.8   # set the testing threshold for this model
-    predictor = DefaultPredictor(cfg)
-
-    # class_names = MetadataCatalog.get("train_set").thing_classes
-
-    class_names = ['Plate', 'Bowl', 'Cup', 'Fork', 'Spoon', 'Knife', 'Pretzel', 'Carrot', 'Celery', 
-                   'Strawberry', 'Banana', 'Watermelon', 'Yogurt', 'Cottage Cheese', 'Beans', 'Gripper']
-
     run = maskRCNN()
+    model_path = Path("/home/labuser/Documents/example_scripts/custom_yolo/yolov5s.pt")
+    model = torch.hub.load('ultralytics/yolov5','custom', path=model_path, force_reload=True)
+    #model = torch.hub.load('ultralytics/yolov5','yolov5s')
+    img = run.get_img()
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    results = model(img, size=328)
+
+    
+
+    class_names = ['bowl','carrot','celery','cup','fork','gripper','knife','plate','pretzel','spoon']
+
+    
     rospy.loginfo("Running Inference...")
+
+    boxes = results.pandas().xyxy[0]  # img1 predictions (pandas)
+    predictions = {
+        "pred_boxes": [],
+        "pred_classes": [],
+        "scores": [],
+        "pred_class_name" : []
+    }
+
+    for index, row in boxes.iterrows():
+        x1, y1, x2, y2, confidence, class_id, name = row
+
+        predictions['pred_boxes'].append((x1,y1,x2,y2))
+        if class_id not in predictions['pred_classes']:
+            predictions['pred_classes'].append(class_id)
+            predictions['pred_class_name'].append(name)
+        predictions['scores'].append(confidence)
+
     while not rospy.is_shutdown():
-        # Get image
-        img = run.get_img()
 
         if img is None:
             continue
 
         if run.raf_state is None:
+            print(predictions)
             continue
 
         if run.raf_state.enable_arm_detections:
             rospy.loginfo_once("Running arm detection inference...")
-            outputs = predictor(img)
-            predictions = outputs["instances"].to("cpu")
             detection_msg = run.build_detection_msg(predictions, class_names)
             print(detection_msg)
             run.publish(detection_msg)
         else:
             detection_msg = DetectionList()
-            print(detection_msg)
             run.publish(detection_msg)
 
 if __name__ == '__main__':

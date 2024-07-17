@@ -13,24 +13,24 @@
 
     <!-- Launch the Robot sub-launch file -->
     <include file="$(find raf)/launch/raf_robot.launch">
-        <arg name="IP_ADDRESS"      default="137.148.209.35"/>      <!-- Robot IP address (Default: 192.168.1.10) -->
+        <arg name="IP_ADDRESS"      default="192.168.1.10"/>      <!-- Robot IP address (Default: 192.168.1.10) -->
         <arg name="robot_name"      default="my_gen3"/>             <!-- Robot namespace -->
-        <arg name="use_rviz"        default="false"/>               <!-- View Rviz (will be slow if using all sub-modules) -->
-        <arg name="use_scene_cam"   default="false"/>               <!-- Launch Realsense D455 Stereo Depth Camera and setup transforms -->
-        <arg name="use_scene"       default="false"/>               <!-- Display wheelchair geometry  -->
+        <arg name="use_rviz"        default="true"/>               <!-- View Rviz (will be slow if using all sub-modules) -->
+        <arg name="use_scene_cam"   default="true"/>               <!-- Launch Realsense D455 Stereo Depth Camera and setup transforms -->
+        <arg name="use_scene"       default="true"/>               <!-- Display wheelchair geometry  -->
         <arg name="hard_limits"     default="false"/>               <!-- Be careful when setting this to "true." The arm will move much faster. -->
     </include>
 
     <!-- Launch the Perception sub-launch file -->
     <include file="$(find raf)/launch/raf_perception.launch">
         <arg name="use_arm_network"     default="true"/>            <!-- Arm camera object detection -->
-        <arg name="use_scene_network"   default="false"/>           <!-- Scene camera object detection (Currently same model as arm model but could be individualized in the future) -->
+        <arg name="use_scene_network"   default="true"/>           <!-- Scene camera object detection (Currently same model as arm model but could be individualized in the future) -->
         <arg name="use_face_network"    default="false"/>           <!-- Not integrated yet. Still in virtual environment -->
     </include>
 
     <!-- Launch the HMI sub-launch file -->
     <include file="$(find raf)/launch/raf_hmi.launch">
-        <arg name="start_talon"         default="true"/>            <!-- Starts Talon in a separate terminal window -->
+        <arg name="start_talon"         default="false"/>            <!-- Starts Talon in a separate terminal window -->
         <arg name="start_qtcreator"     default="true"/>            <!-- Launches GUI. Specify executable or editable version in sub-launch file -->
     </include>
 

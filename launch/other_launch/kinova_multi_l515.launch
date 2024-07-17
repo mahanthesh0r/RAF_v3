@@ -1,7 +1,7 @@
 
 <launch>
 
-    <arg name="IP_ADDRESS" default="137.148.209.35"/>
+    <arg name="IP_ADDRESS" default="192.168.1.10"/>
     <arg name="robot_name" default="my_gen3"/>
     <arg name="camera_name" default="scene_camera"/>
 

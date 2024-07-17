@@ -33,6 +33,7 @@ from kortex_api.autogen.client_stubs.VisionConfigClientRpc import VisionConfigCl
 from kortex_api.autogen.client_stubs.DeviceManagerClientRpc import DeviceManagerClient
 from kortex_api.autogen.messages import DeviceConfig_pb2, VisionConfig_pb2
 import random
+import time
 
 class executeAction(object):
     def __init__(self):
@@ -122,7 +123,7 @@ class executeAction(object):
     def init_camera(self):
 
         args = Namespace()
-        args.ip = '137.148.209.35'
+        args.ip = '192.168.1.10'
         args.password = 'admin'
         args.username = 'admin'
 
@@ -172,7 +173,7 @@ class executeAction(object):
 
     def focus_camera(self):
         args = Namespace()
-        args.ip = '137.148.209.35'
+        args.ip = '192.168.1.10'
         args.password = 'admin'
         args.username = 'admin'
 
@@ -200,7 +201,7 @@ class executeAction(object):
 
     def init_set_positions(self):
         # self.home_joints = [0.34554671604492154, -1.2907505571031779, -1.852130001189777, 0.24850590296763947, -1.7745574449579484, 1.5154674240937918]       # More to center
-        self.home_joints = [0.032253489866490015, -1.3306542976124893, -1.8414975968537446, 0.10480068192728456, -1.7593289572126576, 1.5593387419951033]       # More to the left to avoid tablet for now
+        self.home_joints = [0.3898367417254534, -1.3306542976124893, -1.8414975968537446, 0.10480068192728456, -1.7593289572126576, 1.5593387419951033]       # More to the left to avoid tablet for now
         self.feed_idle_joints = [2.513291966051138, -1.095005553821264, -1.3615879789381964, 0.109762700315077, -1.5953208446412184, 1.4780307028602755]
         self.cup_joints = [-0.5945805407643991, 1.106155676673208, -0.9047104433940882, -2.099077472221773, 1.8922959299084068, 2.50452404079427]             # More to the left to avoid tablet for now
         self.pre_feed_grasp_joints = [1.155544664879, -0.044854024343551124, -1.3250680509099393, 0.794122679128548, -2.016315746605925, -0.0640495568486239]
@@ -210,6 +211,14 @@ class executeAction(object):
         # self.feed_sip_joints = [1.2175008439527668, -0.07879654506882883, -1.7244276984949511, 1.2870921727137363, -1.834673246560417, -0.1592021720682828]
         self.feed_sip_joints = [1.1288620544433325, -0.028720061827632648, -1.8476036926010782, 1.2115385589042975, -1.8585982868453614, -0.35643907819286014]
         # TODO: eat-idle position can use visual servoing to move arm so centroid of all detections is centered in cam frame
+        self.cup_pickup = [-0.4327020281544337, 1.148985153172907, -0.9906663367245018, -2.0673075924022437, 1.8596483179999581, 2.4911957078341067]
+        self.feed_joint = [0.2817659544419645, 0.06593853914034577, -1.8604162628708356, 0.012479104151759455, -1.1359649969530297, 1.5621045871199648]
+        self.feed_grasp = [0.281678688, 0.2402271182, -1.8603813563, 0.0112050138, -1.0966950888, 1.5619475075]
+        self.fork_joint = [-0.07380997406683994, -0.013456488532876542, -2.0048597117658864, -0.1374272253020339, -1.0794337824809326, 1.5622093068750844]
+        self.fork_pickup = [-0.07382742735936046, 0.0969879465333249, -2.011177803658106, -0.13751449176463357, -1.0190802969469692, 1.5619126009022455]
+        self.skew_joint = [1.0399369815083013, 0.12388347030655751, -2.5042158640539838, 0.6599962566416557, 0.7842811526761719, -1.9353257943664322]
+        self.skew_food = [1.0362717900791132, 0.12144000935376545, -2.5297500310106606, 0.6551267880285916, 0.6626142505196473, -1.9330743196313596]
+        self.new_pre_sip = [1.0666056124787746, 0.26330037095586456, -1.2710534810573908, -1.972326774508712, 1.9078019520624816, 2.797204285586272]
 
     def action_callback(self, msg):
         self.action = msg.data
@@ -486,9 +495,13 @@ class executeAction(object):
 
         if self.action is not None and self.action != 'Cancel':
             if self.action == 'Grasp':
-                self.grasp()
+                self.grasp_mod()
             elif self.action == 'Sip':
-                self.sip()
+                #self.sip()
+                self.compute_ik()
+                
+            elif self.action == 'Skewer':
+                self.skewer()
             else:
                 start_time = rospy.get_time()
                 while (rospy.get_time() - start_time) < 5.0:
@@ -924,6 +937,54 @@ class executeAction(object):
                 done = False
                 timer = None
     
+    def grasp_mod(self):
+        print("\n---------- Beginning Grasp ----------")
+
+        self.pub_msg.publish('Wait for grasp.')
+        rospy.sleep(0.1)
+
+        success_g1 = self.move('gripper', 0.65)
+        success = self.move('joint', self.feed_grasp, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+        if success:
+            #success1 = self.move('joint', self.feed_grasp, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+            success_g2 = self.move('gripper', 0.90)
+            success2 = self.move('joint', self.feed_grasp_joints, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+            time.sleep(3)
+            success_g3 = self.move('gripper', 0.65)
+            success3 = self.move('joint', self.home_joints, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+            success_g4 = self.move('gripper', 0)
+
+        else:
+            print("Move to Home failed.")
+            self.reset()
+
+        success = False
+        success_1 = False    
+        success_2 = False
+        success_3 = False
+        success_4 = False
+        success_5 = False
+        success_6 = False
+        success_g2 = False
+        success_g1 = False
+        success_g3 = False
+        success_g4 = False
+
+        rospy.sleep(0.1)
+
+        self.pub_msg.publish(self.action + ' complete.')
+        rospy.sleep(1.0)
+        self.request_pub.publish('to-gui-disable-selection')
+        rospy.sleep(0.1)
+        self.request_pub.publish('system-state-idle')
+
+        # Focus Camera
+        print("Focusing camera...")
+        rospy.sleep(1.0)
+        self.focus_camera()
+        print("Done.")
+
+
     def grasp(self):
         print("\n---------- Beginning Grasp ----------")
 
@@ -1083,6 +1144,138 @@ class executeAction(object):
         rospy.sleep(1.0)
         self.focus_camera()
         print("Done.")
+
+
+    def skewer(self):
+        print("\n---------- Beginning Skewer ----------")
+
+        success = self.move('joint', self.fork_joint, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+        success_g1 = self.move('gripper', 0.6)
+        if success:
+            success1 = self.move('joint', self.fork_pickup, tolerance=0.01, vel=0.5, accel=0.5, attempts=20, time=10.0, constraints=None)
+            success_g2 = self.move('gripper', 0.8)
+            success2 = self.move('joint', self.home_joints, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+            if success2:
+                success3 = self.move('joint', self.skew_joint, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+                success4 = self.move('joint', self.skew_food, tolerance=0.01, vel=0.5, accel=0.5, attempts=20, time=10.0, constraints=None)
+                #success5 = self.move('joint', self.home_joints, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+                success6 = self.move('joint', self.new_pre_sip, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+                time.sleep(4)
+                success6 = self.move('joint', self.fork_joint, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+                success1 = self.move('joint', self.fork_pickup, tolerance=0.01, vel=0.5, accel=0.5, attempts=20, time=10.0, constraints=None)
+                success_g2 = self.move('gripper', 0.6)
+                success6 = self.move('joint', self.fork_joint, tolerance=0.01, vel=0.5, accel=0.5, attempts=20, time=10.0, constraints=None)
+                success7 = self.move('joint', self.home_joints, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+                success_g4 = self.move('gripper', 0)
+        else:
+            print("Move to skew failed")
+            self.reset()
+        
+        success = False
+        success_1 = False    
+        success_2 = False
+        success_3 = False
+        success_4 = False
+        success_5 = False
+        success_6 = False
+        success_7 = False
+        success_g2 = False
+        success_g1 = False
+        success_g4 = False
+
+        rospy.sleep(0.1)
+
+        self.pub_msg.publish(self.action + ' complete.')
+        rospy.sleep(1.0)
+        self.request_pub.publish('to-gui-disable-selection')
+        rospy.sleep(0.1)
+        self.request_pub.publish('system-state-idle')
+
+        # Focus Camera
+        print("Focusing camera...")
+        rospy.sleep(1.0)
+        self.focus_camera()
+        print("Done.")
+
+
+    def sip_mod(self):
+        print("\n---------- Beginning Sip ----------")
+
+        success = self.move('joint', self.cup_joints, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+        if success:
+            success_1 = self.move('joint', self.cup_pickup, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+            success_g1 = self.move('gripper', 0.5)
+            #success_2 = self.move('joint', self.home_joints, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+            success_3 = self.move('joint', self.new_pre_sip, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+            time.sleep(5)
+            #success_4 = self.move('joint', self.home_joints, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+            success_1 = self.move('joint', self.cup_pickup, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+            success_g2 = self.move('gripper', 0)
+            success_5 = self.move('joint', self.cup_joints, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+            success_6 = self.move('joint', self.home_joints, tolerance=0.01, vel=1.0, accel=1.0, attempts=20, time=10.0, constraints=None)
+        else:
+            print("Move to Home failed.")
+            self.reset()
+        
+
+        success = False
+        success_1 = False    
+        success_2 = False
+        success_3 = False
+        success_4 = False
+        success_5 = False
+        success_6 = False
+        success_g2 = False
+        success_g1 = False
+
+
+
+        rospy.sleep(0.1)
+
+        self.pub_msg.publish(self.action + ' complete.')
+        rospy.sleep(1.0)
+        self.request_pub.publish('to-gui-disable-selection')
+        rospy.sleep(0.1)
+        self.request_pub.publish('system-state-idle')
+
+        # Focus Camera
+        print("Focusing camera...")
+        rospy.sleep(1.0)
+        self.focus_camera()
+        print("Done.")
+
+
+    
+    def compute_ik(self):
+        print("----------------- COMPUTING IK -----------------")
+        import geometry_msgs.msg
+        target_pose = geometry_msgs.msg.Pose()
+        target_pose.position.x = 0.3136286437511444
+        target_pose.position.y = 0.0068659791722893715
+        target_pose.position.z = 0.3252539336681366
+
+        rot = self.tf.transformations.quaternion_from_euler(-179.53775024414062, -0.30681607127189636, 90.62300872802734)
+
+        target_pose.orientation.x = rot[0]
+        target_pose.orientation.y = rot[1]
+        target_pose.orientation.z = rot[2]
+        target_pose.orientation.w = rot[3]
+
+        
+
+        # Set the target pose for the end-effector
+        self.arm_group.set_pose_target(target_pose)
+
+        # Plan the trajectory to the goal
+        plan = self.arm_group.plan()
+
+        # check if planning was successful
+        if plan:
+            joint_values = self.arm_group.get_current_joint_values()
+            print("Planning Succ: {}".format(joint_values))
+            rospy.loginfo("Planning Succ: {}".format(joint_values))
+        else:
+            rospy.loginfo("Planning Failed")
 
     def sip(self):
         print("\n---------- Beginning Sip ----------")
