@@ -498,7 +498,7 @@ class executeAction(object):
                 self.grasp_mod()
             elif self.action == 'Sip':
                 #self.sip()
-                self.compute_ik()
+                self.compute_ik2()
                 
             elif self.action == 'Skewer':
                 self.skewer()
@@ -1244,7 +1244,66 @@ class executeAction(object):
         self.focus_camera()
         print("Done.")
 
+    def compute_ik2(self):
+        print("----------------- COMPUTING IK -----------------")
+        from moveit_msgs.msg import PositionIKRequest
+        from moveit_msgs.srv import GetPositionIK, GetPositionIKRequest
+        from geometry_msgs.msg import PoseStamped
 
+        rospy.wait_for_service('/my_gen3/compute_ik')
+        # Create a service proxy for the IK service
+        # ik_service = rospy.ServiceProxy('/my_gen3/compute_ik', GetPositionIK)
+
+        # ik_request = GetPositionIKRequest()
+        # ik_request.ik_request.group_name = "arm"
+        # ik_request.ik_request.ik_link_name = "end_effector_link"
+        # ik_request.ik_request.pose_stamped.header.frame_id = "base_link"
+        # ik_request.ik_request.pose_stamped.pose.position.x = 0.337
+        # ik_request.ik_request.pose_stamped.pose.position.y = -0.001
+        # ik_request.ik_request.pose_stamped.pose.position.z = 0.444
+        
+        thetaX = radians(101.8)
+        thetaY = radians(1.8)
+        thetaZ = radians(94.6)
+
+        rot = quaternion_from_euler(thetaX, thetaY, thetaZ)
+        # ik_request.ik_request.pose_stamped.pose.orientation.x = rot[0]
+        # ik_request.ik_request.pose_stamped.pose.orientation.y = rot[1]
+        # ik_request.ik_request.pose_stamped.pose.orientation.z = rot[2]
+        # ik_request.ik_request.pose_stamped.pose.orientation.w = rot[3]
+        # ik_request.ik_request.timeout.secs = 2
+        # ik_request.ik_request.avoid_collisions = True
+
+        P = self.get_cartesian_pose()
+        P.position.x = 0.602
+        P.position.y = 0.065
+        P.position.z = 0.123
+        P.orientation.x = rot[0]
+        P.orientation.y = rot[1]
+        P.orientation.z = rot[2]
+        P.orientation.w = rot[3]
+
+        success = self.move('pose', P, tolerance=0.01, vel=1.0, accel=1.0, attempts=10, time=15.0, constraints=None)
+        if success:
+            print("Done.")
+        else:
+            print("Move to Overhead failed.")
+            self.reset()
+       
+        # try:
+        #     # Call the IK service
+        #     response = ik_service(ik_request)
+        #     if response.error_code.val == response.error_code.SUCCESS:
+        #         # Extract the joint angles from the response
+        #         joint_angles = response.solution.joint_state.position
+        #         print("Joint Angles: ", joint_angles)
+        #         return joint_angles
+        #     else:
+        #         rospy.logerr("IK request failed")
+        #         return None
+        # except rospy.ServiceException as e:
+        #     rospy.logerr("Service call failed: %s" % e)
+        #     return None
     
     def compute_ik(self):
         print("----------------- COMPUTING IK -----------------")
@@ -1254,7 +1313,12 @@ class executeAction(object):
         target_pose.position.y = 0.0068659791722893715
         target_pose.position.z = 0.3252539336681366
 
-        rot = self.tf.transformations.quaternion_from_euler(-179.53775024414062, -0.30681607127189636, 90.62300872802734)
+        thetaX = radians(-179.53775024414062)
+        thetaY = radians(-0.30681607127189636)
+        thetaZ = radians(90.62300872802734)
+
+        rot = quaternion_from_euler(thetaX, thetaY, thetaZ)
+        
 
         target_pose.orientation.x = rot[0]
         target_pose.orientation.y = rot[1]
