@@ -497,8 +497,8 @@ class executeAction(object):
             if self.action == 'Grasp':
                 self.grasp_mod()
             elif self.action == 'Sip':
-                #self.sip()
-                self.compute_ik2()
+                self.sip()
+                #self.compute_ik2()
                 
             elif self.action == 'Skewer':
                 self.skewer()
@@ -858,6 +858,10 @@ class executeAction(object):
 
         return(p)
     
+    
+    
+    
+    
     def search_detections(self, P):
         det = Detection()
         # Get all detections
@@ -870,10 +874,16 @@ class executeAction(object):
         mid = None
         prev_d = inf
         for i in range(len(det_list.class_ids)):
+            print("Class ID: ", det_list.class_ids[i])
+            print("Selection ID: ", selection.class_id)
             if det_list.class_ids[i] == selection.class_id:
+                print("Class ID Matched: ", det_list.class_ids[i])
                 c, m, a, b = self.compute_centroid(det_list.masks[i])
+                print("Centroid: ", c, "Midpoint: ", m, "Left: ", a, "Right: ", b)
                 p = self.pixel_to_3d_point(int(c[0]), int(c[1]))
+                print("pixel to 3d point: ", p)
                 p = self.transform_point(p, 'camera_color_frame', 'base_link')
+                print("transformed point: ", p)
                 d = self.compute_dist(P, p)
                 print("######## DISTANCE STUFF ############")
                 print(f"Distance to detection {i}: {d:2.2f} meters")
@@ -891,6 +901,12 @@ class executeAction(object):
         det.class_names = det_list.class_names[idx]
         det.score = det_list.scores[idx]
         det.mask = det_list.masks[idx]
+
+
+        print("Selected Detection Centroid: ", cent)
+        print("Selected Detection Midpoint: ", mid)
+        print("Selected Detection Left: ", left)
+        print("Selected Detection Right: ", right)
 
         return det, cent, mid, left, right
     
@@ -1262,11 +1278,16 @@ class executeAction(object):
         # ik_request.ik_request.pose_stamped.pose.position.y = -0.001
         # ik_request.ik_request.pose_stamped.pose.position.z = 0.444
         
-        thetaX = radians(101.8)
-        thetaY = radians(1.8)
-        thetaZ = radians(94.6)
+        thetaX = radians(-179.8)
+        thetaY = radians(6.2)
+        thetaZ = radians(91.1)
 
         rot = quaternion_from_euler(thetaX, thetaY, thetaZ)
+        e = euler_from_quaternion([rot[0], rot[1], rot[2], rot[3]])
+        print("Quaternion: ", rot)
+        print("Euler: ", degrees(e[0]), degrees(e[1]), degrees(e[2]))
+        print("New Euler: ", degrees(0.4782606926919657), degrees(-0.7722499972611762), degrees(0.3695210560790377)
+              , degrees(-0.19583370667520086))
         # ik_request.ik_request.pose_stamped.pose.orientation.x = rot[0]
         # ik_request.ik_request.pose_stamped.pose.orientation.y = rot[1]
         # ik_request.ik_request.pose_stamped.pose.orientation.z = rot[2]
@@ -1275,15 +1296,15 @@ class executeAction(object):
         # ik_request.ik_request.avoid_collisions = True
 
         P = self.get_cartesian_pose()
-        P.position.x = 0.602
-        P.position.y = 0.065
-        P.position.z = 0.123
+        P.position.x = 0.362
+        P.position.y = -0.058
+        P.position.z = 0.121
         P.orientation.x = rot[0]
         P.orientation.y = rot[1]
         P.orientation.z = rot[2]
         P.orientation.w = rot[3]
 
-        success = self.move('pose', P, tolerance=0.01, vel=1.0, accel=1.0, attempts=10, time=15.0, constraints=None)
+        success = self.move('pose', P, tolerance=0.01, vel=0.5, accel=0.5, attempts=10, time=100.0, constraints=None)
         if success:
             print("Done.")
         else:
@@ -1365,40 +1386,46 @@ class executeAction(object):
             print("Move to Cup_joints failed.")
             self.reset()
 
-        # Construct pre-grasp pose
-        # TODO: Maybe this step can be skipped to save time in the future
-        P_pregrasp = self.get_cartesian_pose()
-        P_pregrasp.position.x = p.x + .03
-        P_pregrasp.position.y = p.y + .2
-        P_pregrasp.position.z = p.z + .05
-        # Orientation: If looking from the gripper's forward perspective, x is to the left, y is up, and z is pointing away
-        thetaX = radians(110)
-        thetaY = radians(0)
-        thetaZ = radians(0)
-        q = quaternion_from_euler(thetaX, thetaY, thetaZ)        # thetaX, thetaY, thetaZ
-        P_pregrasp.orientation.x = q[0]
-        P_pregrasp.orientation.y = q[1]
-        P_pregrasp.orientation.z = q[2]
-        P_pregrasp.orientation.w = q[3]
+        # # Construct pre-grasp pose
+        # # TODO: Maybe this step can be skipped to save time in the future
+        # P_pregrasp = self.get_cartesian_pose()
+        # P_pregrasp.position.x = p.x + .03
+        # P_pregrasp.position.y = p.y + .2
+        # P_pregrasp.position.z = p.z + .05
+        # # Orientation: If looking from the gripper's forward perspective, x is to the left, y is up, and z is pointing away
+        # thetaX = radians(110)
+        # thetaY = radians(0)
+        # thetaZ = radians(0)
+        # q = quaternion_from_euler(thetaX, thetaY, thetaZ)        # thetaX, thetaY, thetaZ
+        # P_pregrasp.orientation.x = q[0]
+        # P_pregrasp.orientation.y = q[1]
+        # P_pregrasp.orientation.z = q[2]
+        # P_pregrasp.orientation.w = q[3]
 
-        # Move to pre-grasp pose
-        print("MOVING TO: ", P_pregrasp)
-        success = self.move('pose', P_pregrasp, tolerance=0.01, vel=1.0, accel=1.0, attempts=10, time=5.0, constraints=None)
-        if success:
-            print("Done.")
-        else:
-            print("Move to Pre-grasp failed.")
-            self.reset()
+        # # Move to pre-grasp pose
+        # print("MOVING TO: ", P_pregrasp)
+        # success = self.move('pose', P_pregrasp, tolerance=0.01, vel=1.0, accel=1.0, attempts=10, time=5.0, constraints=None)
+        # if success:
+        #     print("Done.")
+        # else:
+        #     print("Move to Pre-grasp failed.")
+        #     self.reset()
 
+        rospy.sleep(2.0)
+        # Focus Camera
+        print("Focusing camera...")
+        rospy.sleep(1.0)
+        self.focus_camera()
+        print("Done.")
         rospy.sleep(2.0)
 
         # Search detections for one containing centroid
         det, c, _, _, _ = self.search_detections(p)
 
-        # Acquire item pose
+        # # Acquire item pose
         pos, gripper_open, gripper_close, item_width = self.acquire_sip_pose(det, c)
 
-        # Acquire item
+        # # Acquire item
         success, sip_pose = self.execute_sip(pos, gripper_open, gripper_close, item_width)
 
         rospy.sleep(2.0)
@@ -1581,9 +1608,15 @@ class executeAction(object):
                 print("Planning Successful.")
                 print(f"Planning time: {planning_time}")
                 print("Executing Plan...")
+                joint_positions = plan.joint_trajectory.points[-1].positions
+
+                print("Last Planning Angles: ", [degrees(joint_positions[i]) for i in range(len(joint_positions))])
+                print("Planning size: ", len(plan.joint_trajectory.points))
                 success = arm_group.execute(plan, wait=True)
                 arm_group.stop()
                 arm_group.clear_pose_targets()
+            else:
+                print("Planning Failed.")
             
         elif goal_type == 'joint':
             # Get the current joint positions
